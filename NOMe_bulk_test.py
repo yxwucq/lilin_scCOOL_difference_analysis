@@ -67,21 +67,21 @@ class NDR(object):
                                     
                 pval = self.__chisq_bin(idx)
                 """如果bin显著，无NDR则该bin作为NDR的基点，有NDR则和现有bin必有overlap（否则上一步被截住），对NDR elongate即可"""
-                if pval < self.p_value_cutoff:
+                if pval > self.p_value_cutoff:
     #                    self.__NDR_remove()
                     del self.l_umt_met[idx]
                     continue
                 else:
                     if 'beg' not in self.NDR_info:
                         self.NDR_info = {
-                            'beg': self.bin_begin, 'end': self.bin_endin, 'idx':[idx], 'pval':[pval], 
+                            'beg': self.bin_begin, 'end': self.bin_endin, 'idx':[idx], 'log_pval':[np.log10(pval)], 
                             'umt':[self.l_umt_met[idx][0]], 'met':[self.l_umt_met[idx][1]]
                         }
                     else:
                         if idx not in self.NDR_info['idx']:
                             self.NDR_info['end'] = self.bin_endin
                             self.NDR_info['idx'].append(idx)
-                            self.NDR_info['pval'].append(pval)
+                            self.NDR_info['log_pval'].append(np.log10(pval))
                             self.NDR_info['umt'].append(self.l_umt_met[idx][0])
                             self.NDR_info['met'].append(self.l_umt_met[idx][1])
 
@@ -114,7 +114,7 @@ class NDR(object):
 
         np_idx = np.array(self.NDR_info['idx'], dtype="int")
 
-        np_pval= np.array(self.NDR_info['pval'])
+        np_pval= np.array(self.NDR_info['log_pval'])
         np_umt = np.array(self.NDR_info['umt'])
         np_met = np.array(self.NDR_info['met'])
         np_length = self.NDR_info['end'] - self.NDR_info['beg'] +1
@@ -133,7 +133,7 @@ class NDR(object):
             只考虑 umet的reads 足够少的情况，这种情况下 reads 全被甲基化，即未得到组蛋白足够的保护，NDR
         '''
         if np_obs[0] < np_exp[0]:  
-            pval = -1*np.log10(1-scipy.stats.chi2.cdf(chisquare, 1))
+            pval = scipy.stats.chi2.sf(chisquare, 1)
 #        print self.bin_begin, self.bin_endin, np_obs, np_exp, pval, idx
         return pval
 

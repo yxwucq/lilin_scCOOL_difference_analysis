@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 
+import argparse
 import fractions
 import gzip
 import os
@@ -11,7 +12,7 @@ import pandas as pd
 import scipy.stats
 
 help_text = """
-Usage: python "input_bedgraph.gz" "output.bedgraph"
+Usage: python "input_bedgraph.gz" -d depth -p logpvalue
 Example: python NOMe_bulk_test.py /datd/huboqiang/test_NOM/02.SingleC/mESC_gF28_1/singleC/chr10.ACG.TCG.bed.gz 
 Method: Using shift window to slide on chr, and make calls on each region
 """
@@ -23,12 +24,13 @@ class NDR(object):
     """
     Peaks calling within a chromosome.
     """
-    def __init__(self, chrom, methyl_fraction, p_value_cutoff=1e-20, bin_len=100, step_len=20, dist_len=140):
+    def __init__(self, chrom, methyl_fraction, p_value_cutoff=1e-20, depth_cutoff=5, bin_len=100, step_len=20, dist_len=140):
         self.chrom = chrom # Specifying the chromosome working on
         self.bin_len = bin_len # Peaks calling bin length
         self.step_len = step_len # Sliding step length
         self.dist_len = dist_len # Peaks width lower limit
         self.p_value_cutoff = p_value_cutoff # P-value cutoff for pearson's chi-squared test
+        self.depth_cutoff = depth_cutoff
         
         self.np_RATIO = np.array([1-methyl_fraction, methyl_fraction])
         
@@ -64,13 +66,15 @@ class NDR(object):
                         
                     del self.l_umt_met[idx]
                     continue
-                                    
+
+                total_idx_depth = self.l_umt_met[idx][0] + self.l_umt_met[idx][1]
                 pval = self.__chisq_bin(idx)
                 """如果bin显著，无NDR则该bin作为NDR的基点，有NDR则和现有bin必有overlap（否则上一步被截住），对NDR elongate即可"""
-                if pval > self.p_value_cutoff:
+                
+                if total_idx_depth < self.depth_cutoff or pval > self.p_value_cutoff: # count the depth
     #                    self.__NDR_remove()
                     del self.l_umt_met[idx]
-                    continue
+                    continue 
                 else:
                     if 'beg' not in self.NDR_info:
                         self.NDR_info = {
@@ -157,15 +161,31 @@ def calculate_met_fraction(input_file_path):
     df_sum['fraction'] = df_sum[4] / (df_sum[3]+df_sum[4])
     return df_sum
 
+
 def main():
+    parser = argparse.ArgumentParser(description="Peaks calling for NOMe-sesq")
+    parser.add_argument("-i", "--input", help="Input File", required=True)
+    parser.add_argument("-d", "--depth", help="Minimal depth to be called", required=False)
+    parser.add_argument("-p", "--log_p_value", help="log(p_value_cutoff)", required=False)
+    parser.add_argument("-m", "--manual", help="Manual help", required=False)
+    argument = parser.parse_args()
+    
     try:
-        DEPTH = None
-        input_file_path = sys.argv[1] # Input bedgraph file for calling
-        if len(sys.argv) == 3:
-            DEPTH = int(sys.argv[2]) # Specify the depth
+        input_file_path = argument.input
+        if argument.manual:
+            print(help_text)
+        if not argument.depth:
+            depth_cutoff = 5
+        else:
+            depth_cutoff = int(argument.depth)
+        if not argument.log_p_value:
+            p_value_cutoff = 1e-15
+        else:
+            p_value_cutoff = 10**int(argument.log_p_value)
     except IndexError:
         show_help()
         sys.exit(1)
+
     # log_p_value_cutoff = -10
     met_fraction_df = calculate_met_fraction(input_file_path)
     working_chr = None
@@ -178,12 +198,12 @@ def main():
             methyl_fraction = met_fraction_df.loc[working_chr,'fraction']
             if m_NDR:
                 m_NDR.last_line() 
-            m_NDR = NDR(working_chr, methyl_fraction, p_value_cutoff=1e-20, bin_len=100, step_len=20, dist_len=140)
+            m_NDR = NDR(working_chr, methyl_fraction, p_value_cutoff=p_value_cutoff, depth_cutoff=depth_cutoff, bin_len=100, step_len=20, dist_len=140)
         
         position_beginning = int(line[1])
         unmet_cnt, met_cnt = float(line[3]), float(line[4])
         
-        if DEPTH and (met_cnt+unmet_cnt) < DEPTH: continue
+        # if DEPTH and (met_cnt+unmet_cnt) < DEPTH: continue
         m_NDR.parse_line(position_beginning, unmet_cnt, met_cnt)
     
     input_file.close()

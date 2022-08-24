@@ -71,3 +71,31 @@ while true; do
     tail merge_for_peaks_calling.sh.o3339068 
 done
 
+# using python to do peaks calling
+# depth的选择在此处作用不大 理论上应该卡depth = 5/理论甲基化概率（卡方检验要求）
+cell_types=("Zygote" "2cell" "4cell" "8cell" "Morula" "ICM" "TE")
+for each_type in "${cell_types[@]}"; do
+    echo "Processing ${each_type}"
+    python -i NOMe_bulk_test.py "${each_type}_merged_gch.bedgraph" -d 5 -log_p_val -12 > "${each_type}_special_peaks_pval_12.bedgraph"
+done
+
+# scp the data to PC
+
+# find special peaks
+cell_types=("Zygote" "2cell" "4cell" "8cell" "Morula" "ICM" "TE")
+other_types=("Zygote" "2cell" "4cell" "8cell" "Morula")
+
+for each_type in "${cell_types[@]}"; do
+    awk -v OFS='\t' '{print $1, $2, $3}' "${each_type}_special_peaks_pval_12.bedgraph" > "${each_type}_special_peaks_pval_12.bed"
+done
+
+# bedtools merge -d 500 -i ICM_special_peaks_pval_12.bed > tmpfile && mv tmpfile ICM_special_peaks_pval_12.bed
+# bedtools merge -d 500 -i TE_special_peaks_pval_12.bed > tmpfile && mv tmpfile TE_special_peaks_pval_12.bed
+
+for each_type in "${other_types[@]}"; do
+    bedtools window -v -a ICM_special_peaks_pval_12.bed -b "${each_type}_special_peaks_pval_12.bed" -w 1000 > tmpfile && mv tmpfile ICM_special_peaks_pval_12.bed
+    bedtools window -v -a TE_special_peaks_pval_12.bed -b "${each_type}_special_peaks_pval_12.bed" -w 1000 > tmpfile && mv tmpfile TE_special_peaks_pval_12.bed
+done
+
+# r-script to analyze
+# notation_bedtools.R

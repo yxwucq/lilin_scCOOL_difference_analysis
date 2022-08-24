@@ -24,12 +24,14 @@ plotAvgProf(tagMatrix, xlim=c(-3000, 3000),
 ICM_special_peaks_Anno <- annotatePeak(ICM_special_peaks, tssRegion=c(-3000, 3000),
                                  TxDb=txdb, annoDb="org.Hs.eg.db", verbose=FALSE)
 plotAnnoPie(ICM_special_peaks_Anno)
+
 write.table(as.data.frame(ICM_special_peaks_Anno), "../pval_12_data/ICM_peaks_Anno.xls", quote=F, row.names=F, sep="\t")
 
 # 2
 TE_special_peaks_Anno <- annotatePeak(TE_special_peaks, tssRegion=c(-3000, 3000),
                                   TxDb=txdb, annoDb="org.Hs.eg.db", verbose=FALSE)
 plotAnnoPie(TE_special_peaks_Anno)
+
 write.table(as.data.frame(TE_special_peaks_Anno), "../pval_12_data/TE_peaks_Anno.xls", quote=F, row.names=F, sep="\t")
 
 # KEGG
